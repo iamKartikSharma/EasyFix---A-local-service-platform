@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
-import { Calendar, Clock, MapPin, ArrowLeft } from "lucide-react";
+import { Calendar, Clock, MapPin, ArrowLeft, CreditCard, Banknote, Loader2 } from "lucide-react";
 import Link from "next/link";
 import LocationInput from "@/components/LocationInput";
 import { createClient } from "@/utils/supabase/client";
@@ -13,6 +13,9 @@ export default function BookingPage() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [providerName, setProviderName] = useState("Loading...");
     const [serviceType, setServiceType] = useState("Service");
+
+    // Payment State (Just Preference now)
+    const [paymentMethod, setPaymentMethod] = useState<"cash" | "online">("cash");
 
     // Fetch Provider Details
     useEffect(() => {
@@ -48,12 +51,22 @@ export default function BookingPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validation
+        if (!formData.date || !formData.time || !formData.address || !formData.description) {
+            alert("Please fill in all fields.");
+            return;
+        }
+
         setIsSubmitting(true);
         const supabase = createClient();
 
         try {
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) throw new Error("You must be logged in to book.");
+
+            // Calculate a random estimated price for negotiation reference
+            const randomPrice = Math.floor(Math.random() * (1200 - 500 + 1)) + 500;
 
             const { error } = await supabase
                 .from('bookings')
@@ -64,11 +77,17 @@ export default function BookingPage() {
                     booking_date: formData.date,
                     booking_time: formData.time,
                     address: formData.address,
-                    status: 'requested'
+                    status: 'requested',
+                    // Save preference
+                    payment_method: paymentMethod,
+                    // CRITICAL: Always pending initially. Payment happens after service.
+                    payment_status: 'pending',
+                    price: randomPrice
                 });
 
             if (error) throw error;
 
+            alert("Booking Requested! Payment will be handled after the service is complete.");
             router.push("/dashboard/customer/bookings");
         } catch (error: any) {
             console.error("Booking error:", error);
@@ -164,18 +183,68 @@ export default function BookingPage() {
                         </p>
                     </div>
 
+                    {/* Payment Method */}
+                    <div>
+                        <label className="block text-sm font-medium text-foreground mb-3">
+                            Preferred Payment Method
+                        </label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod("cash")}
+                                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${paymentMethod === "cash"
+                                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                        : "border-border hover:border-gray-300"
+                                    }`}
+                            >
+                                <div className={`p-2 rounded-full ${paymentMethod === "cash" ? "bg-primary text-white" : "bg-gray-100 text-gray-500"}`}>
+                                    <Banknote className="h-5 w-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-semibold text-foreground">Cash after Service</div>
+                                    <div className="text-xs text-muted-foreground">Pay the provider directly</div>
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod("online")}
+                                className={`flex items-center gap-3 p-4 rounded-lg border-2 transition-all ${paymentMethod === "online"
+                                        ? "border-primary bg-primary/5 ring-1 ring-primary"
+                                        : "border-border hover:border-gray-300"
+                                    }`}
+                            >
+                                <div className={`p-2 rounded-full ${paymentMethod === "online" ? "bg-primary text-white" : "bg-gray-100 text-gray-500"}`}>
+                                    <CreditCard className="h-5 w-5" />
+                                </div>
+                                <div className="text-left">
+                                    <div className="font-semibold text-foreground">Pay Online</div>
+                                    <div className="text-xs text-muted-foreground">Pay after job is completed</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Summary & Submit */}
-                    <div className="pt-4 border-t border-border flex items-center justify-between">
+                    <div className="pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
                         <div className="text-sm">
-                            <span className="text-muted-foreground">Estimated Price:</span>
+                            <span className="text-muted-foreground">Estimated Invoice:</span>
                             <span className="block font-bold text-lg text-foreground">₹500 - ₹1200</span>
                         </div>
                         <button
                             type="submit"
                             disabled={isSubmitting}
-                            className="bg-primary text-primary-foreground px-8 py-3 rounded-md font-medium hover:bg-teal-800 transition-colors disabled:opacity-50"
+                            className={`w-full sm:w-auto px-8 py-3 rounded-md font-medium transition-colors flex items-center justify-center gap-2 ${isSubmitting ? "bg-primary/70 cursor-not-allowed" : "bg-primary hover:bg-teal-800"
+                                } text-primary-foreground`}
                         >
-                            {isSubmitting ? "Booking..." : "Confirm Booking"}
+                            {isSubmitting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Booking...
+                                </>
+                            ) : (
+                                "Confirm Booking"
+                            )}
                         </button>
                     </div>
                 </form>

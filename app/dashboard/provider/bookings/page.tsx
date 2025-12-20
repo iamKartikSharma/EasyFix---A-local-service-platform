@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X, MapPin, Calendar, User, FileText, Clock, Play, CheckCircle } from "lucide-react";
+import { Check, X, MapPin, Calendar, User, FileText, Clock, Play, CheckCircle, CreditCard, Banknote, AlertCircle, Receipt } from "lucide-react";
 import { createClient } from "@/utils/supabase/client";
 
 export default function BookingsPage() {
@@ -56,17 +56,37 @@ export default function BookingsPage() {
         };
     }, []);
 
-    const updateStatus = async (id: string, newStatus: string) => {
+    const updateStatus = async (id: string, newStatus: string, currentJob?: any) => {
         try {
+            // Logic for completing a job
+            let updatePayload: any = { status: newStatus };
+
+            if (newStatus === "completed" && currentJob) {
+                if (currentJob.payment_method === 'cash') {
+                    // CASH FLOW: Verify collection immediately
+                    const confirmed = window.confirm(
+                        `💰 PLEASE CONFIRM:\n\nHave you collected ₹${currentJob.price} cash from ${currentJob.customer?.full_name}?\n\nClick OK to confirm payment and complete job.`
+                    );
+
+                    if (!confirmed) return; // Stop if not collected
+
+                    // Mark as Paid + Completed + Source=Cash
+                    updatePayload.payment_status = 'paid';
+                    updatePayload.payment_source = 'Cash Provided';
+                    updatePayload.transaction_id = 'CASH-' + Math.random().toString(36).substr(2, 6).toUpperCase();
+                }
+                // ONLINE FLOW: Do nothing extra. Job marks completed. Payment stays pending.
+            }
+
             const { error } = await supabase
                 .from('bookings')
-                .update({ status: newStatus })
+                .update(updatePayload)
                 .eq('id', id);
 
             if (error) throw error;
-            // No need to manual fetch, realtime will trigger it (or we can optimistic update)
-            // But simple fetch is safer
+
             fetchJobs();
+
         } catch (error: any) {
             console.error("Error updating status:", error);
             alert("Failed to update status: " + error.message);
@@ -83,6 +103,36 @@ export default function BookingsPage() {
             return ["completed", "cancelled", "rejected"].includes(job.status);
         }
     });
+
+    const getPaymentBadge = (job: any) => {
+        if (job.payment_status === 'paid') {
+            return (
+                <div className="flex flex-col items-end">
+                    <div className="flex items-center gap-1 text-xs px-2 py-1 bg-green-100 text-green-700 rounded-full font-medium">
+                        <CheckCircle className="h-3 w-3" /> Paid: ₹{job.price}
+                    </div>
+                    {job.payment_source && (
+                        <span className="text-[10px] text-gray-500 mt-1">via {job.payment_source}</span>
+                    )}
+                </div>
+            )
+        } else if (job.status === 'completed') {
+            // Completed but Unpaid (Waiting for Online Payment)
+            return (
+                <div className="flex items-center gap-1 text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded-full font-medium animate-pulse">
+                    <AlertCircle className="h-3 w-3" /> Waiting for Payment
+                </div>
+            )
+        } else if (job.payment_method === 'cash') {
+            return <div className="flex items-center gap-1 text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-medium">
+                <Banknote className="h-3 w-3" /> Collect Cash: ₹{job.price}
+            </div>
+        } else {
+            return <div className="flex items-center gap-1 text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium">
+                <CreditCard className="h-3 w-3" /> Online (Pending)
+            </div>
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -137,23 +187,27 @@ export default function BookingsPage() {
             ) : filteredJobs.length > 0 ? (
                 <div className="space-y-4">
                     {filteredJobs.map((job) => (
-                        <div key={job.id} className="bg-white rounded-lg shadow-sm border border-border p-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 animate-in fade-in slide-in-from-bottom-4">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-lg font-bold text-foreground">
-                                        #{job.id.slice(0, 8)} - {job.customer?.full_name || "Customer"}
-                                    </h3>
-                                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${job.status === 'requested' ? 'bg-yellow-100 text-yellow-800' :
-                                        job.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
-                                            job.status === 'in_progress' ? 'bg-purple-100 text-purple-800' :
-                                                job.status === 'completed' ? 'bg-green-100 text-green-800' :
-                                                    'bg-gray-100 text-gray-800'
-                                        }`}>
-                                        {job.status.replace("_", " ")}
-                                    </span>
+                        <div key={job.id} className="bg-white rounded-lg shadow-sm border border-border p-6 flex flex-col md:flex-row justify-between items-start gap-4 animate-in fade-in slide-in-from-bottom-4">
+                            <div className="space-y-2 w-full">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-lg font-bold text-foreground">
+                                            {job.customer?.full_name || "Customer"}
+                                        </h3>
+                                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${job.status === 'requested' ? 'bg-yellow-100 text-yellow-800' :
+                                            job.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
+                                                job.status === 'in_progress' ? 'bg-purple-100 text-purple-800' :
+                                                    job.status === 'completed' ? 'bg-green-100 text-green-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                            }`}>
+                                            {job.status.replace("_", " ")}
+                                        </span>
+                                    </div>
+
+                                    {getPaymentBadge(job)}
                                 </div>
 
-                                <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm text-muted-foreground">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-muted-foreground">
                                     <div className="flex items-center gap-1">
                                         <MapPin className="h-4 w-4" /> {job.address}
                                     </div>
@@ -163,16 +217,25 @@ export default function BookingsPage() {
                                     <div className="flex items-center gap-1">
                                         <Clock className="h-4 w-4" /> {job.booking_time}
                                     </div>
+                                    <div className="flex items-center gap-1 font-semibold text-foreground">
+                                        <Banknote className="h-4 w-4" /> ₹{job.price} (Est)
+                                    </div>
                                 </div>
 
+                                {job.transaction_id && (
+                                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-1">
+                                        <Receipt className="h-3 w-3" /> TNX: {job.transaction_id}
+                                    </div>
+                                )}
+
                                 {job.description && (
-                                    <p className="text-sm text-muted-foreground mt-1 max-w-xl bg-gray-50 p-2 rounded">
+                                    <p className="text-sm text-muted-foreground mt-2 bg-gray-50 p-3 rounded border border-gray-100 w-full">
                                         &quot;{job.description}&quot;
                                     </p>
                                 )}
                             </div>
 
-                            <div className="flex gap-2 w-full md:w-auto">
+                            <div className="flex gap-2 w-full md:w-auto shrink-0 mt-2 md:mt-0">
                                 {job.status === "requested" && (
                                     <>
                                         <button
@@ -199,10 +262,11 @@ export default function BookingsPage() {
                                 )}
                                 {job.status === "in_progress" && (
                                     <button
-                                        onClick={() => updateStatus(job.id, "completed")}
-                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700"
+                                        onClick={() => updateStatus(job.id, "completed", job)}
+                                        className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-medium hover:bg-green-700 shadow-sm"
                                     >
-                                        <CheckCircle className="h-4 w-4 mr-2" /> Mark Completed
+                                        <CheckCircle className="h-4 w-4 mr-2" />
+                                        {job.payment_method === 'cash' ? 'Collect & Complete' : 'Complete (Wait for Pay)'}
                                     </button>
                                 )}
                             </div>
