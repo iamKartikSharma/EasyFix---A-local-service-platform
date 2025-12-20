@@ -282,6 +282,7 @@ export default function BookingsPage() {
                                         &quot;{job.description}&quot;
                                     </p>
                                 )}
+
                             </div>
 
                             <div className="flex gap-2 w-full md:w-auto shrink-0 mt-2 md:mt-0">

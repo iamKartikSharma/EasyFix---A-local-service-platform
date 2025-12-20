@@ -101,20 +101,16 @@ export default function CustomerBookings() {
         if (!paymentBooking) return;
         try {
             // Note: We do NOT generate transactionId here. The provider does that upon confirmation.
-            const { error } = await supabase
-                .from('bookings')
-                .update({
-                    payment_status: 'pending', // Keep pending to avoid enum errors
-                    payment_source: 'UPI Verifying', // Use this to track state
-                    // transaction_id: ... // Leave null for now
-                })
-                .eq('id', paymentBooking.id);
+
+            // Use RPC to bypass RLS and ensure update succeeds
+            const { error } = await supabase.rpc('mark_payment_verifying', {
+                booking_id: paymentBooking.id
+            });
 
             if (error) throw error;
             fetchBookings();
         } catch (error: any) {
             console.error("Payment Update Error:", error);
-            alert("Failed to update payment status. Please try again.");
         }
     };
 
@@ -269,13 +265,20 @@ export default function CustomerBookings() {
                                     )}
 
                                     {booking.status === "completed" && booking.payment_status === 'paid' && (
-                                        <button
-                                            onClick={() => openRatingModal(booking)}
-                                            className="w-full flex items-center justify-center gap-2 text-sm bg-gray-100 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
-                                        >
-                                            <Star className="h-4 w-4 text-amber-400 fill-current" />
-                                            {booking.rating ? "Update Rating" : "Rate Service"}
-                                        </button>
+                                        booking.rating ? (
+                                            <div className="w-full flex items-center justify-center gap-2 text-sm bg-amber-50 text-amber-900 px-5 py-2.5 rounded-xl border border-amber-100 font-medium">
+                                                <Star className="h-4 w-4 text-amber-500 fill-current" />
+                                                You rated {booking.rating}/5
+                                            </div>
+                                        ) : (
+                                            <button
+                                                onClick={() => openRatingModal(booking)}
+                                                className="w-full flex items-center justify-center gap-2 text-sm bg-gray-100 text-gray-700 px-5 py-2.5 rounded-xl hover:bg-gray-200 transition-colors font-semibold"
+                                            >
+                                                <Star className="h-4 w-4 text-amber-400 fill-current" />
+                                                Rate Service
+                                            </button>
+                                        )
                                     )}
 
                                     {booking.transaction_id && (
