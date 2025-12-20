@@ -94,13 +94,18 @@ export default function BookingsPage() {
     };
 
     // Filter logic
+    // Filter logic
     const filteredJobs = jobs.filter(job => {
         if (activeTab === "requests") {
             return job.status === "requested";
         } else if (activeTab === "active") {
-            return ["accepted", "in_progress"].includes(job.status);
+            // Active: Accepted, In Progress, OR Completed but NOT PAID (Waiting for payment)
+            return ["accepted", "in_progress"].includes(job.status) ||
+                (job.status === "completed" && job.payment_status !== "paid");
         } else {
-            return ["completed", "cancelled", "rejected"].includes(job.status);
+            // History: Cancelled, Rejected, OR Completed AND PAID
+            return ["cancelled", "rejected"].includes(job.status) ||
+                (job.status === "completed" && job.payment_status === "paid");
         }
     });
 
@@ -134,6 +139,50 @@ export default function BookingsPage() {
         }
     };
 
+
+
+    // Function to confirm online payment
+    const confirmPayment = async (job: any) => {
+        const confirmed = window.confirm(`💰 Check your bank account.\n\nDid you receive ₹${job.price} from ${job.customer?.full_name}?\n\nClick OK to confirm.`);
+        if (!confirmed) return;
+
+        const transactionId = "TXN-" + Math.random().toString(36).substr(2, 9).toUpperCase();
+
+        const { error } = await supabase
+            .from('bookings')
+            .update({
+                payment_status: 'paid',
+                payment_source: 'UPI', // Clear the 'Verifying' suffix
+                transaction_id: transactionId
+            })
+            .eq('id', job.id);
+
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            fetchJobs();
+        }
+    };
+
+    const rejectPayment = async (job: any) => {
+        const confirmed = window.confirm(`⚠️ Are you sure you haven't received the payment?\n\nThis will reject the customer's claim and ask them to pay again.\n\nClick OK to Reject.`);
+        if (!confirmed) return;
+
+        const { error } = await supabase
+            .from('bookings')
+            .update({
+                payment_status: 'pending',
+                payment_source: 'online' // Reset to default online status
+            })
+            .eq('id', job.id);
+
+        if (error) {
+            alert("Error: " + error.message);
+        } else {
+            fetchJobs();
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -163,9 +212,9 @@ export default function BookingsPage() {
                             }`}
                     >
                         Active Jobs
-                        {jobs.filter(j => ["accepted", "in_progress"].includes(j.status)).length > 0 && (
+                        {jobs.filter(j => ["accepted", "in_progress"].includes(j.status) || (j.status === "completed" && j.payment_status !== "paid")).length > 0 && (
                             <span className="ml-2 bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full text-xs">
-                                {jobs.filter(j => ["accepted", "in_progress"].includes(j.status)).length}
+                                {jobs.filter(j => ["accepted", "in_progress"].includes(j.status) || (j.status === "completed" && j.payment_status !== "paid")).length}
                             </span>
                         )}
                     </button>
@@ -236,6 +285,24 @@ export default function BookingsPage() {
                             </div>
 
                             <div className="flex gap-2 w-full md:w-auto shrink-0 mt-2 md:mt-0">
+
+                                {job.payment_source === 'UPI Verifying' && (
+                                    <>
+                                        <button
+                                            onClick={() => rejectPayment(job)}
+                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-red-200 bg-red-50 text-red-600 rounded-md text-sm font-semibold hover:bg-red-100 shadow-sm"
+                                        >
+                                            <X className="h-4 w-4" /> Not Received
+                                        </button>
+                                        <button
+                                            onClick={() => confirmPayment(job)}
+                                            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md text-sm font-bold hover:bg-green-700 shadow-md animate-pulse"
+                                        >
+                                            <CheckCircle className="h-4 w-4" /> Confirm Recieved
+                                        </button>
+                                    </>
+                                )}
+
                                 {job.status === "requested" && (
                                     <>
                                         <button

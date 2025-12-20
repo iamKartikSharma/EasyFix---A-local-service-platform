@@ -1,23 +1,29 @@
 @import "tailwindcss";
 
 :root {
-  /* Light/Matchable Palette */
-  --background: #f8fafc; /* Slate 50 */
-  --foreground: #0f172a; /* Slate 900 */
-  
-  --primary: #0f766e; /* Teal 700 */
+  /* Apple-inspired Palette */
+  --background: #F5F5F7;
+  /* Apple Clean Grey */
+  --foreground: #1D1D1F;
+  /* Apple Text Black */
+
+  --primary: #0071E3;
+  /* Apple Blue */
   --primary-foreground: #ffffff;
-  
-  --secondary: #f59e0b; /* Amber 500 */
-  --secondary-foreground: #ffffff;
-  
-  --muted: #f1f5f9; /* Slate 100 */
-  --muted-foreground: #64748b; /* Slate 500 */
-  
+
+  --secondary: #E8E8ED;
+  /* Apple Light Grey Element */
+  --secondary-foreground: #1D1D1F;
+
+  --muted: #F2F2F7;
+  --muted-foreground: #86868B;
+  /* Apple Subtext */
+
   --card: #ffffff;
-  --card-foreground: #0f172a;
-  
-  --border: #e2e8f0; /* Slate 200 */
+  --card-foreground: #1D1D1F;
+
+  --border: #d2d2d7;
+  /* Apple Border */
 }
 
 @theme inline {
@@ -32,7 +38,7 @@
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
-  
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -40,5 +46,7 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

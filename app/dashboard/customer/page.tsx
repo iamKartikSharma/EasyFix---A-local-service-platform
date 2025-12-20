@@ -62,7 +62,7 @@ export default function CustomerDashboard() {
                     const { data: activeBookings, error: bookingsError } = await supabase
                         .from('bookings')
                         .select('provider_id')
-                        .eq('customer_id', user.id)
+                        // Removed .eq('customer_id', user.id) to check GLOBAL availability
                         .in('status', ['accepted', 'in_progress']);
 
                     if (bookingsError) {
